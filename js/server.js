@@ -41,7 +41,7 @@ const auth = (req, res, next) => {
 };
 
 // Serve static files from the "public" directory
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Routes
 
@@ -112,9 +112,9 @@ app.get('/articles/:slug', (req, res) => {
 
 // Fallback route to serve index.html for any other requests
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, '..', 'login.html'));
 });
 
-app.listen(3000, () => {
-  console.log('Server started on port 3000');
+app.listen(3002, () => {
+  console.log('Server started on port 3002');
 });
