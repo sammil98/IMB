@@ -112,7 +112,7 @@ app.get('/articles/:slug', (req, res) => {
 
 // Fallback route to serve index.html for any other requests
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'login.html'));
+  res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
 
 app.listen(3002, () => {
