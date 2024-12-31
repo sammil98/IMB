@@ -1,19 +1,29 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const mysql = require('mysql2');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const path = require('path');
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Setup database
-const db = new sqlite3.Database(':memory:');
-db.serialize(() => {
-  db.run("CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT)");
-  db.run("CREATE TABLE articles (id INTEGER PRIMARY KEY, title TEXT, content TEXT, author TEXT, metaTitle TEXT, metaDescription TEXT, slug TEXT, date TEXT)");
+// Setup database connection
+const db = mysql.createConnection({
+  host: 'localhost',
+  user: 'bloguser',
+  password: 'password',
+  database: 'blog'
+});
+
+db.connect((err) => {
+  if (err) {
+    console.error('Error connecting to MySQL:', err);
+    return;
+  }
+  console.log('Connected to MySQL');
 });
 
 // Middleware for authentication
@@ -30,15 +40,21 @@ const auth = (req, res, next) => {
   }
 };
 
+// Serve static files from the "public" directory
+app.use(express.static(path.join(__dirname, 'public')));
+
 // Routes
 
 // Register
 app.post('/register', (req, res) => {
   const { username, password } = req.body;
   const hashedPassword = bcrypt.hashSync(password, 10);
-  db.run("INSERT INTO users (username, password) VALUES (?, ?)", [username, hashedPassword], function(err) {
+  db.query("INSERT INTO users (username, password) VALUES (?, ?)", [username, hashedPassword], (err) => {
     if (err) {
-      return res.status(400).send('User already registered.');
+      if (err.code === 'ER_DUP_ENTRY') {
+        return res.status(400).send('User already registered.');
+      }
+      return res.status(500).send('Error registering user.');
     }
     res.send('User registered');
   });
@@ -47,9 +63,10 @@ app.post('/register', (req, res) => {
 // Login
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
-  db.get("SELECT * FROM users WHERE username = ?", [username], (err, user) => {
-    if (err || !user) return res.status(400).send('Invalid username or password.');
+  db.query("SELECT * FROM users WHERE username = ?", [username], (err, results) => {
+    if (err || results.length === 0) return res.status(400).send('Invalid username or password.');
 
+    const user = results[0];
     const validPassword = bcrypt.compareSync(password, user.password);
     if (!validPassword) return res.status(400).send('Invalid username or password.');
 
@@ -63,10 +80,10 @@ app.post('/articles', auth, (req, res) => {
   const { title, content, metaTitle, metaDescription, slug } = req.body;
   const author = req.user.id;
   const date = new Date().toISOString();
-  db.run("INSERT INTO articles (title, content, author, metaTitle, metaDescription, slug, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    [title, content, author, metaTitle, metaDescription, slug, date], function(err) {
+  db.query("INSERT INTO articles (title, content, author, metaTitle, metaDescription, slug, date) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [title, content, author, metaTitle, metaDescription, slug, date], (err) => {
     if (err) {
-      return res.status(400).send('Error creating article.');
+      return res.status(500).send('Error creating article.');
     }
     res.send('Article created');
   });
@@ -74,23 +91,28 @@ app.post('/articles', auth, (req, res) => {
 
 // Get Articles
 app.get('/articles', (req, res) => {
-  db.all("SELECT * FROM articles", [], (err, articles) => {
+  db.query("SELECT * FROM articles", (err, results) => {
     if (err) {
-      return res.status(400).send('Error fetching articles.');
+      return res.status(500).send('Error fetching articles.');
     }
-    res.json(articles);
+    res.json(results);
   });
 });
 
 // Get Single Article by Slug
 app.get('/articles/:slug', (req, res) => {
   const { slug } = req.params;
-  db.get("SELECT * FROM articles WHERE slug = ?", [slug], (err, article) => {
-    if (err || !article) {
+  db.query("SELECT * FROM articles WHERE slug = ?", [slug], (err, results) => {
+    if (err || results.length === 0) {
       return res.status(404).send('Article not found.');
     }
-    res.json(article);
+    res.json(results[0]);
   });
+});
+
+// Fallback route to serve index.html for any other requests
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(3000, () => {
