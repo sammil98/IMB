@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/5/tinymce.min.js" referrerpolicy="origin"></script>
+  <script>
+    tinymce.init({
+      selector: '#content'
+    });
+  </script>
+</head>
+<body>
+  <div id="dashboard">
+    <h2>Dashboard</h2>
+    <form id="articleForm">
+      <input type="text" id="title" placeholder="Title" required>
+      <input type="text" id="metaTitle" placeholder="Meta Title" required>
+      <input type="text" id="metaDescription" placeholder="Meta Description" required>
+      <input type="text" id="slug" placeholder="Slug" required>
+      <textarea id="content" placeholder="Content"></textarea>
+      <button type="submit">Add Article</button>
+    </form>
+  </div>
+
+  <script>
+    document.getElementById('articleForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const title = document.getElementById('title').value;
+      const metaTitle = document.getElementById('metaTitle').value;
+      const metaDescription = document.getElementById('metaDescription').value;
+      const slug = document.getElementById('slug').value;
+      const content = tinymce.get('content').getContent();
+      const token = localStorage.getItem('token');
+
+      fetch('/articles', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-auth-token': token
+        },
+        body: JSON.stringify({ title, metaTitle, metaDescription, slug, content })
+      }).then(res => res.text()).then(data => {
+        alert(data);
+      });
+    });
+  </script>
+</body>
+</html>
